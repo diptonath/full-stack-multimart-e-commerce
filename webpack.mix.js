@@ -1,4 +1,4 @@
-const mix = require("laravel-mix");
+let mix = require('laravel-mix');
 
 /*
  |--------------------------------------------------------------------------
@@ -11,7 +11,7 @@ const mix = require("laravel-mix");
  |
  */
 
-mix.js("resources/js/app.js", "public/js")
-    .react()
-    .sass("resources/sass/app.scss", "public/css")
-    .sourceMaps();
+mix.react('resources/assets/js/app.js', 'public/js')
+   .react('resources/assets/js/dashboard.js', 'public/js')
+   .sass('resources/assets/sass/app.scss', 'public/css')
+   .sass('resources/assets/sass/dashboard.scss', 'public/css');

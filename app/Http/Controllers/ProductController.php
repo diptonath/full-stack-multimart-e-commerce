@@ -2,33 +2,83 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
+use App\Stock;
+use App\Product;
+use App\Category;
 use Illuminate\Http\Request;
+use App\Http\Requests\StoreProduct;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
-    public function show(Request $request, Product $product)
+    public function index() {
+        return Product::with('category', 'stocks')->paginate(5);
+    }
+
+    public function show($id)
     {
-        $cartTotal = \Cart::getTotal();
-        $cartCount = \Cart::getContent()->count();
+        $product = Product::with('category', 'stocks')->findOrFail($id);
 
-        $related_products = Product::whereHas('category', function ($query) use ($product) {
-            $query->whereId($product->category_id);
-        })
-            ->where('id', '<>', $product->id)
-            ->inRandomOrder()
-            ->take(4)
-            ->get(['id', 'slug', 'name', 'price']);
+        if ($product->reviews()->exists()) {
+            $product['review'] = $product->reviews()->avg('rating');
+            $product['num_reviews'] = $product->reviews()->count();
+        }
 
-        return view('frontend.product.show', compact('product', 'related_products', 'cartTotal', 'cartCount'));
+        return $product;
     }
 
-    public function getProductDetail(Product $product){
+    public function store(StoreProduct $request) {
 
-        return response()->json([
-            'status' => 200,
-            'product' => $product,
-        ]);
+        if($user = JWTAuth::parseToken()->authenticate()) {
 
+            $validator = $request->validated();
+
+            $data = null;
+            if($request->hasFile('photos')) {
+                foreach($request->file('photos') as $photo) {
+                    $name = time() . '_' . $photo->getClientOriginalName();
+                    $photo->move('img', $name);
+                    $data[] = $name;
+                }
+            }
+
+            $product = Product::create([
+                'user_id' => $user->id,
+                'category_id' => $request->category_id,
+                'photo' => json_encode($data),
+                'brand' => $request->brand,
+                'name' => $request->name,
+                'description' => $request->description,
+                'details' => $request->details,
+                'price' => $request->price,
+            ]);
+
+            Stock::create([
+                'product_id' => $product->id,
+                'size' => $request->size,
+                'color' => $request->color,
+                'quantity' => $request->quantity,
+            ]);
+
+        }
+        
     }
+
+    public function destroy($id) {
+
+        if($user = JWTAuth::parseToken()->authenticate()) {
+            $product = Product::findOrFail($id);
+    
+            // return $product->photo;
+            if($product) {
+                if($product->photo != null)
+                    foreach(json_decode($product->photo) as $photo)    
+                        unlink(public_path() . '\\img\\' . $photo);
+    
+                $product->delete();
+            }
+        }
+    }
+
 }
